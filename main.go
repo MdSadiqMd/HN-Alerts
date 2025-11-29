@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/syumai/workers"
 	"github.com/syumai/workers/cloudflare/fetch"
@@ -61,14 +62,39 @@ func main() {
 		}
 		fmt.Println("Top 10 feed IDs:", top10)
 
-		w.Header().Set("content-type", "application/json")
-		b, err := json.Marshal(top10)
-		if err != nil {
-			fmt.Println("encode error:", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		for i, id := range top10 {
+			hn_item, err := fetch.NewRequest(req.Context(), http.MethodGet, fmt.Sprintf("https://hacker-news.firebaseio.com/v0/item/%d.json?print=pretty", id), nil)
+			if err != nil {
+				fmt.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			hn_item_res, err := cli.Do(hn_item, nil)
+			if err != nil {
+				fmt.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			defer hn_item_res.Body.Close()
+
+			hn_item_body, err := io.ReadAll(hn_item_res.Body)
+			if err != nil {
+				fmt.Println("read error:", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			var hn_item_data map[string]interface{}
+			if err := json.Unmarshal(hn_item_body, &hn_item_data); err != nil {
+				fmt.Println("decode error:", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			fmt.Println("HN Item:", i+1, hn_item_data["title"])
+			w.Write([]byte("HN Item: " +  hn_item_data["title"].(string)))
 		}
-		w.Write(b)
+		w.Header().Set("content-type", "application/json")
 	})
 	workers.Serve(nil) // use http.DefaultServeMux
 }
