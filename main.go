@@ -8,7 +8,11 @@ import (
 
 	"github.com/MdSadiqMd/HN-Alerts/internal"
 	"github.com/syumai/workers"
+	"github.com/syumai/workers/cloudflare/kv"
 )
+
+const hnAlertsNamespace = "HN_ALERTS"
+const hnAlertsKey = "hn-alerts"
 
 func main() {
 	http.HandleFunc("/hello", func(w http.ResponseWriter, req *http.Request) {
@@ -29,8 +33,48 @@ func main() {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		fmt.Println(top10)
-		w.Write([]byte(fmt.Sprintf("Top 10 HN Feeds: %v", top10)))
+		fmt.Printf("Fetched top10 from HN: (%d items): %v\n", len(top10), top10)
+
+		HNAlertsKV, err := kv.NewNamespace(hnAlertsNamespace)
+		if err != nil {
+			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		count := 0
+		for i, title := range top10 {
+			if title == "," {
+				continue
+			}
+
+			key := fmt.Sprintf("%d", count)
+			fmt.Printf("Writing to KV: key=%s, value=%s\n", key, title)
+
+			err = HNAlertsKV.PutString(key, title, nil)
+			if err != nil {
+				fmt.Printf("KV PutString error at i=%d, key=%s, value=%s: %v\n", i, key, title, err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			count++
+		}
+
+		fmt.Println("Reading Top 10 HN Feeds from KV:")
+		var results []string
+		for i := 0; i < count; i++ {
+			readKey := fmt.Sprintf("%d", i)
+			title, err := HNAlertsKV.GetString(readKey, nil)
+			if err != nil {
+				fmt.Printf("KV GetString error at i=%d, key=%s: %v\n", i, readKey, err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			fmt.Printf("From KV index %d: %s\n", i, title)
+
+			results = append(results, title)
+		}
+		w.Write([]byte(fmt.Sprintf("Top 10 HN Feeds: %v", results)))
 	})
 	workers.Serve(nil) // use http.DefaultServeMux
 }
