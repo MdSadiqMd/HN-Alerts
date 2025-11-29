@@ -9,11 +9,17 @@ import (
 	"github.com/syumai/workers/cloudflare/fetch"
 )
 
-func FetchHNTop10(req *http.Request) ([]string, error) {
+type HNStory struct {
+	ID    int
+	Title string
+	URL   string
+}
+
+func FetchHNTop10(req *http.Request) ([]HNStory, error) {
 	return FetchHNTopN(req, 10)
 }
 
-func FetchHNTopN(req *http.Request, n int) ([]string, error) {
+func FetchHNTopN(req *http.Request, n int) ([]HNStory, error) {
 	cli := fetch.NewClient()
 
 	r, err := fetch.NewRequest(req.Context(), http.MethodGet, "https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty", nil)
@@ -48,7 +54,7 @@ func FetchHNTopN(req *http.Request, n int) ([]string, error) {
 	}
 	fmt.Printf("Top %d feed IDs: %v\n", len(topN), topN)
 
-	titles := make([]string, 0, len(topN))
+	stories := make([]HNStory, 0, len(topN))
 	for i, id := range topN {
 		hn_item, err := fetch.NewRequest(req.Context(), http.MethodGet, fmt.Sprintf("https://hacker-news.firebaseio.com/v0/item/%d.json?print=pretty", id), nil)
 		if err != nil {
@@ -79,8 +85,15 @@ func FetchHNTopN(req *http.Request, n int) ([]string, error) {
 		if !ok {
 			title = ""
 		}
-		fmt.Printf("HN Item %d: %s\n", i+1, title)
-		titles = append(titles, title)
+
+		story := HNStory{
+			ID:    id,
+			Title: title,
+			URL:   fmt.Sprintf("https://news.ycombinator.com/v0/item/%d.json", id),
+		}
+
+		fmt.Printf("HN Item %d: [%d] %s\n   URL: %s\n", i+1, id, title, story.URL)
+		stories = append(stories, story)
 	}
-	return titles, nil
+	return stories, nil
 }

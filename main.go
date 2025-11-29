@@ -23,16 +23,17 @@ func main() {
 		io.Copy(w, bytes.NewReader(b))
 	})
 	http.HandleFunc("/hn-alerts", func(w http.ResponseWriter, req *http.Request) {
-		fmt.Println("Fetching top 20 titles from HN...")
-		top20Titles, err := internal.FetchHNTopN(req, 20)
+		fmt.Println("Fetching top 20 stories from HN...")
+
+		top20Stories, err := internal.FetchHNTopN(req, 20)
 		if err != nil {
 			fmt.Println("Error fetching from HN:", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		fmt.Printf("Fetched %d titles from HN\n", len(top20Titles))
+		fmt.Printf("Fetched %d stories from HN\n", len(top20Stories))
 
-		uniqueTop10, err := internal.GetHNTop10FromKV(req, top20Titles)
+		uniqueTop10, err := internal.GetHNTop10FromKV(req, top20Stories)
 		if err != nil {
 			fmt.Println("Error getting top 10 from KV:", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -40,8 +41,12 @@ func main() {
 		}
 
 		w.Write([]byte(fmt.Sprintf("Top %d Unique HN Feeds:\n", len(uniqueTop10))))
-		for i, title := range uniqueTop10 {
-			w.Write([]byte(fmt.Sprintf("%d. %s\n", i+1, title)))
+		for i, story := range uniqueTop10 {
+			w.Write([]byte(fmt.Sprintf("%d. %s\n   URL: %s\n\n", i+1, story.Title, story.URL)))
+		}
+
+		if len(uniqueTop10) == 0 {
+			w.Write([]byte("No new feeds found. All top 20 stories have already been seen.\n"))
 		}
 	})
 	workers.Serve(nil) // use http.DefaultServeMux
