@@ -91,10 +91,9 @@ func main() {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			fmt.Println("HN Item:", i+1, hn_item_data["title"])
-			w.Write([]byte("HN Item: " +  hn_item_data["title"].(string)))
+			fmt.Printf("HN Item %d: %s\n", i+1, hn_item_data["title"])
+			w.Write([]byte(strconv.Itoa(i+1) + ". " + hn_item_data["title"].(string) + "\n"))
 		}
-		w.Header().Set("content-type", "application/json")
 	})
 	workers.Serve(nil) // use http.DefaultServeMux
 }
