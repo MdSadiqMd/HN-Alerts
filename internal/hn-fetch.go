@@ -10,6 +10,10 @@ import (
 )
 
 func FetchHNTop10(req *http.Request) ([]string, error) {
+	return FetchHNTopN(req, 10)
+}
+
+func FetchHNTopN(req *http.Request, n int) ([]string, error) {
 	cli := fetch.NewClient()
 
 	r, err := fetch.NewRequest(req.Context(), http.MethodGet, "https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty", nil)
@@ -37,14 +41,15 @@ func FetchHNTop10(req *http.Request) ([]string, error) {
 		fmt.Println("decode error:", err)
 		return nil, err
 	}
-	top10 := ids
-	if len(ids) > 10 {
-		top10 = ids[:10]
-	}
-	fmt.Println("Top 10 feed IDs:", top10)
 
-	titles := make([]string, 0, len(top10))
-	for i, id := range top10 {
+	topN := ids
+	if len(ids) > n {
+		topN = ids[:n]
+	}
+	fmt.Printf("Top %d feed IDs: %v\n", len(topN), topN)
+
+	titles := make([]string, 0, len(topN))
+	for i, id := range topN {
 		hn_item, err := fetch.NewRequest(req.Context(), http.MethodGet, fmt.Sprintf("https://hacker-news.firebaseio.com/v0/item/%d.json?print=pretty", id), nil)
 		if err != nil {
 			fmt.Println(err)
@@ -75,9 +80,6 @@ func FetchHNTop10(req *http.Request) ([]string, error) {
 			title = ""
 		}
 		fmt.Printf("HN Item %d: %s\n", i+1, title)
-		if i > 0 {
-			titles = append(titles, ",")
-		}
 		titles = append(titles, title)
 	}
 	return titles, nil
