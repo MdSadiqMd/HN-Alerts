@@ -89,7 +89,7 @@ func FetchHNTopN(req *http.Request, n int) ([]HNStory, error) {
 		story := HNStory{
 			ID:    id,
 			Title: title,
-			URL:   fmt.Sprintf("https://news.ycombinator.com/v0/item/%d.json", id),
+			URL:   fmt.Sprintf("https://news.ycombinator.com/item?id=%d", id),
 		}
 
 		fmt.Printf("HN Item %d: [%d] %s\n   URL: %s\n", i+1, id, title, story.URL)
