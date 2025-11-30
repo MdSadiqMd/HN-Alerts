@@ -14,9 +14,14 @@
 		"enabled": true
 	},
 	"kv_namespaces": [
+		// {
+		// 	"binding": "HN_ALERTS",
+		// 	"id": "66a03c8e34864baabf300e5fb84778c2",
+		// 	"remote": true
+		// },
 		{
 			"binding": "HN_ALERTS",
-			"id": "66a03c8e34864baabf300e5fb84778c2",
+			"id": "f0fac853be744eae9dc3f0dd59c7ef5c",
 			"remote": true
 		}
 	]
