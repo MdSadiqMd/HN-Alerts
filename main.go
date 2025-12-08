@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,9 +10,42 @@ import (
 	"github.com/MdSadiqMd/HN-Alerts/internal"
 	"github.com/syumai/workers"
 	"github.com/syumai/workers/cloudflare"
+	"github.com/syumai/workers/cloudflare/cron"
 )
 
+func processHNAlerts(ctx context.Context) error {
+	// Create a dummy request for the context
+	req, err := http.NewRequestWithContext(ctx, "GET", "/hn-alerts", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	top20Stories, err := internal.FetchHNTopN(req, 20)
+	if err != nil {
+		return fmt.Errorf("error fetching from HN: %w", err)
+	}
+	fmt.Printf("Fetched %d stories from HN\n", len(top20Stories))
+
+	uniqueTop10, err := internal.GetHNTop10FromKV(req, top20Stories)
+	if err != nil {
+		return fmt.Errorf("error getting top 10 from KV: %w", err)
+	}
+
+	respStr, err := internal.MakeBotMessage(req, uniqueTop10, cloudflare.Getenv("GREEN_API_URL"))
+	if err != nil {
+		return fmt.Errorf("failed to make bot message: %w", err)
+	}
+	fmt.Printf("Message sent to WhatsApp. ID: %s\n", respStr)
+	return nil
+}
+
 func main() {
+	// Register scheduled task for cron trigger
+	cron.ScheduleTask(func(ctx context.Context) error {
+		fmt.Println("Cron trigger fired - processing HN alerts...")
+		return processHNAlerts(ctx)
+	})
+
 	http.HandleFunc("/hello", func(w http.ResponseWriter, req *http.Request) {
 		msg := "Hello!"
 		w.Write([]byte(msg))
@@ -25,31 +59,15 @@ func main() {
 	})
 
 	http.HandleFunc("/hn-alerts", func(w http.ResponseWriter, req *http.Request) {
-		top20Stories, err := internal.FetchHNTopN(req, 20)
+		err := processHNAlerts(req.Context())
 		if err != nil {
-			fmt.Println("Error fetching from HN:", err)
+			fmt.Println("Error processing HN alerts:", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(fmt.Sprintf("Error: %v\n", err)))
 			return
 		}
-		fmt.Printf("Fetched %d stories from HN\n", len(top20Stories))
-
-		uniqueTop10, err := internal.GetHNTop10FromKV(req, top20Stories)
-		if err != nil {
-			fmt.Println("Error getting top 10 from KV:", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		respStr, err := internal.MakeBotMessage(req, uniqueTop10, cloudflare.Getenv("GREEN_API_URL"))
-		if err != nil {
-			fmt.Println("Failed to Make Bot Message", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		fmt.Println(respStr)
 
 		w.Write([]byte("Msg sent to whatsapp.\n"))
-		w.Write([]byte(fmt.Sprintf("%s\n", respStr)))
 	})
 	workers.Serve(nil) // use http.DefaultServeMux
 }
