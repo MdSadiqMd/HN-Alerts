@@ -40,8 +40,10 @@ func processHNAlerts(ctx context.Context) error {
 }
 
 func main() {
-	// Register scheduled task for cron trigger
-	cron.ScheduleTask(func(ctx context.Context) error {
+	// Register scheduled task for cron trigger.
+	// ScheduleTaskNonBlock must be used here since ScheduleTask blocks forever,
+	// which would prevent workers.Serve from being reached below.
+	cron.ScheduleTaskNonBlock(func(ctx context.Context) error {
 		fmt.Println("Cron trigger fired - processing HN alerts...")
 		return processHNAlerts(ctx)
 	})
